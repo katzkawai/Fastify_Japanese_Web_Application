@@ -1,113 +1,113 @@
-# 日本語メモアプリ (Japanese Memo App)
+# 日本語メモアプリ
 
-A beautiful and intuitive memo application built with Fastify that allows users to create, organize, and manage their notes in Japanese. This application features a clean, modern interface with full CRUD operations and persistent JSON-based storage, making it perfect for personal note-taking, journaling, or organizing thoughts and ideas.
+Fastifyで構築された美しく直感的なメモアプリケーションです。ユーザーが日本語でメモを作成、整理、管理できます。このアプリケーションは、クリーンでモダンなインターフェースと完全なCRUD操作、永続的なJSONベースのストレージを特徴とし、個人的なメモ取り、日記、思考やアイデアの整理に最適です。
 
-## ✨ Key Features
+## ✨ 主な機能
 
-- **📝 Full CRUD Operations**: Create, read, update, and delete memos with ease
-- **📋 Title & Content Structure**: Organize memos with descriptive titles and detailed content
-- **🇯🇵 Japanese Language Support**: Optimized UTF-8 encoding and Japanese font rendering
-- **💾 Persistent Storage**: Data is automatically saved in JSON format and persists between sessions
-- **🎨 Beautiful UI**: Modern, gradient-based design with smooth animations and transitions
-- **📱 Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
-- **⚡ Real-time Updates**: Instant UI updates after creating, editing, or deleting memos
-- **🔍 Inline Editing**: Edit memos directly in the interface without navigating to separate pages
-- **📊 Memo Statistics**: View total memo count and creation/update timestamps
-- **🚀 RESTful API**: Clean API endpoints for programmatic access and integrations
+- **📝 完全なCRUD操作**: メモの作成、読み取り、更新、削除が簡単に行えます
+- **📋 タイトル・内容構造**: 説明的なタイトルと詳細な内容でメモを整理
+- **🇯🇵 日本語サポート**: UTF-8エンコーディングと日本語フォントレンダリングを最適化
+- **💾 永続的ストレージ**: データは自動的にJSON形式で保存され、セッション間で永続化
+- **🎨 美しいUI**: スムーズなアニメーションとトランジションを持つモダンなグラデーションベースのデザイン
+- **📱 レスポンシブデザイン**: デスクトップ、タブレット、モバイルデバイスでシームレスに動作
+- **⚡ リアルタイム更新**: メモの作成、編集、削除後に即座にUI更新
+- **🔍 インライン編集**: 別ページに移動することなく、インターフェース内で直接メモを編集
+- **📊 メモ統計**: 総メモ数と作成・更新タイムスタンプを表示
+- **🚀 RESTful API**: プログラムアクセスと統合のためのクリーンなAPIエンドポイント
 
-## 🚀 Installation
+## 🚀 インストール
 
-### Prerequisites
+### 前提条件
 
-Ensure you have the following installed on your system:
+システムに以下がインストールされていることを確認してください：
 
-- **Node.js** (version 16.0 or higher)
-- **npm** (usually comes with Node.js)
-- A modern web browser (Chrome, Firefox, Safari, Edge)
+- **Node.js** (バージョン16.0以上)
+- **npm** (通常Node.jsに付属)
+- モダンなWebブラウザ (Chrome、Firefox、Safari、Edge)
 
-### Step-by-Step Installation
+### ステップバイステップインストール
 
-1. **Clone or download the project**:
+1. **プロジェクトをクローンまたはダウンロード**:
    ```bash
    git clone <your-repository-url>
    cd japanese-memo-app
    ```
 
-2. **Install dependencies**:
+2. **依存関係をインストール**:
    ```bash
    npm install
    ```
 
-3. **Verify installation**:
+3. **インストールを確認**:
    ```bash
    npm list
    ```
 
-4. **Start the application**:
+4. **アプリケーションを起動**:
    ```bash
    npm run dev
    ```
 
-5. **Access the application**:
-   Open your browser and navigate to: `http://localhost:3000`
+5. **アプリケーションにアクセス**:
+   ブラウザを開き、次のURLに移動: `http://localhost:3000`
 
-## 📖 Usage Guide
+## 📖 使用方法ガイド
 
-### Starting the Application
+### アプリケーションの起動
 
 ```bash
-# Start in development mode
+# 開発モードで起動
 npm run dev
 
-# Or start in production mode
+# または本番モードで起動
 npm start
 ```
 
-The application will start on port 3000 and display:
+アプリケーションはポート3000で起動し、以下が表示されます：
 ```
 🚀 日本語メモアプリが http://localhost:3000 で起動しました
 ```
 
-### Web Interface Operations
+### Webインターフェース操作
 
-#### ✍️ Creating a New Memo
-1. Navigate to the main page
-2. Fill in the "新しいメモを作成" (Create New Memo) form:
-   - **タイトル** (Title): Enter a descriptive title for your memo
-   - **内容** (Content): Write the main content of your memo
-3. Click "💾 メモを保存" (Save Memo) to create the memo
+#### ✍️ 新しいメモの作成
+1. メインページに移動
+2. 「新しいメモを作成」フォームに入力:
+   - **タイトル**: メモの説明的なタイトルを入力
+   - **内容**: メモの主な内容を記入
+3. 「💾 メモを保存」をクリックしてメモを作成
 
-#### 📖 Viewing Memos
-- All memos are displayed in the "📋 メモ一覧" (Memo List) section
-- Each memo shows:
-  - Title and content
-  - Creation date and time
-  - Last updated time (if different from creation time)
-  - Action buttons for editing and deletion
+#### 📖 メモの表示
+- すべてのメモは「📋 メモ一覧」セクションに表示されます
+- 各メモには以下が表示されます：
+  - タイトルと内容
+  - 作成日時
+  - 最終更新日時（作成日時と異なる場合）
+  - 編集と削除のアクションボタン
 
-#### ✏️ Editing a Memo
-1. Find the memo you want to edit
-2. Click the "✏️ 編集" (Edit) button
-3. Modify the title and/or content in the edit form
-4. Click "💾 更新" (Update) to save changes
-5. Click "❌ キャンセル" (Cancel) to discard changes
+#### ✏️ メモの編集
+1. 編集したいメモを見つける
+2. 「✏️ 編集」ボタンをクリック
+3. 編集フォームでタイトルや内容を修正
+4. 「💾 更新」をクリックして変更を保存
+5. 「❌ キャンセル」をクリックして変更を破棄
 
-#### 🗑️ Deleting a Memo
-1. Locate the memo you want to delete
-2. Click the "🗑️ 削除" (Delete) button
-3. Confirm deletion in the popup dialog
-4. The memo will be permanently removed
+#### 🗑️ メモの削除
+1. 削除したいメモを見つける
+2. 「🗑️ 削除」ボタンをクリック
+3. ポップアップダイアログで削除を確認
+4. メモは完全に削除されます
 
-### API Endpoints
+### APIエンドポイント
 
-The application provides a RESTful API for programmatic access:
+アプリケーションはプログラムアクセス用のRESTful APIを提供します：
 
-#### 📋 Get All Memos
+#### 📋 全メモ取得
 ```bash
 curl -X GET http://localhost:3000/api/memos
 ```
 
-**Response Example:**
+**レスポンス例:**
 ```json
 [
   {
@@ -120,7 +120,7 @@ curl -X GET http://localhost:3000/api/memos
 ]
 ```
 
-#### ✍️ Create a New Memo
+#### ✍️ 新しいメモの作成
 ```bash
 curl -X POST http://localhost:3000/api/memos \
   -H "Content-Type: application/json" \
@@ -130,7 +130,7 @@ curl -X POST http://localhost:3000/api/memos \
   }'
 ```
 
-#### ✏️ Update a Memo
+#### ✏️ メモの更新
 ```bash
 curl -X PUT http://localhost:3000/api/memos/1 \
   -H "Content-Type: application/json" \
@@ -140,105 +140,105 @@ curl -X PUT http://localhost:3000/api/memos/1 \
   }'
 ```
 
-#### 🗑️ Delete a Memo
+#### 🗑️ メモの削除
 ```bash
 curl -X DELETE http://localhost:3000/api/memos/1
 ```
 
-## 📁 Project Structure
+## 📁 プロジェクト構造
 
 ```
 japanese-memo-app/
-├── index.js          # Main Fastify server application
-├── package.json      # Project dependencies and scripts
-├── data.json         # JSON file for memo data persistence
-└── README.md         # This documentation file
+├── index.js          # メインFastifyサーバーアプリケーション
+├── package.json      # プロジェクトの依存関係とスクリプト
+├── data.json         # メモデータ永続化用JSONファイル
+└── README.md         # このドキュメントファイル
 ```
 
-## ⚙️ Configuration
+## ⚙️ 設定
 
-### Port Configuration
-To change the default port (3000), modify the `index.js` file:
+### ポート設定
+デフォルトポート（3000）を変更するには、`index.js`ファイルを修正してください：
 
 ```javascript
 await fastify.listen({ 
-  port: 8080,  // Change to your desired port
+  port: 8080,  // 希望するポートに変更
   host: '0.0.0.0' 
 });
 ```
 
-### Data Storage Location
-To change the data file location, modify the `DATA_FILE` constant:
+### データストレージの場所
+データファイルの場所を変更するには、`DATA_FILE`定数を修正してください：
 
 ```javascript
-const DATA_FILE = path.join(__dirname, 'my-memos.json'); // Custom filename
+const DATA_FILE = path.join(__dirname, 'my-memos.json'); // カスタムファイル名
 ```
 
-## 🎨 Features in Detail
+## 🎨 詳細機能
 
-### User Interface
-- **Modern Design**: Clean, card-based layout with gradient backgrounds
-- **Smooth Animations**: Hover effects and transitions for better user experience
-- **Responsive Layout**: Automatically adapts to different screen sizes
-- **Emoji Integration**: Visual icons for better navigation and user engagement
+### ユーザーインターフェース
+- **モダンデザイン**: グラデーション背景を持つクリーンなカードベースレイアウト
+- **スムーズアニメーション**: より良いユーザーエクスペリエンスのためのホバーエフェクトとトランジション
+- **レスポンシブレイアウト**: 異なる画面サイズに自動的に適応
+- **絵文字統合**: より良いナビゲーションとユーザーエンゲージメントのための視覚的アイコン
 
-### Data Management
-- **Automatic Timestamps**: Tracks creation and modification times
-- **Data Validation**: Ensures both title and content are provided
-- **Error Handling**: Comprehensive error messages for better debugging
-- **File-based Storage**: Simple JSON file storage without database dependencies
+### データ管理
+- **自動タイムスタンプ**: 作成と変更時刻を追跡
+- **データ検証**: タイトルと内容の両方が提供されることを保証
+- **エラーハンドリング**: より良いデバッグのための包括的なエラーメッセージ
+- **ファイルベースストレージ**: データベース依存関係のないシンプルなJSONファイルストレージ
 
-### Developer Features
-- **Clean API**: RESTful endpoints following best practices
-- **Logging**: Built-in Fastify logging for debugging and monitoring
-- **Error Responses**: Proper HTTP status codes and error messages
+### 開発者向け機能
+- **クリーンAPI**: ベストプラクティスに従ったRESTfulエンドポイント
+- **ログ記録**: デバッグと監視のための組み込みFastifyログ
+- **エラーレスポンス**: 適切なHTTPステータスコードとエラーメッセージ
 
-## 🔧 Troubleshooting
+## 🔧 トラブルシューティング
 
-### Common Issues and Solutions
+### よくある問題と解決方法
 
-1. **Port Already in Use**
+1. **ポートが既に使用中**
    ```
    Error: listen EADDRINUSE: address already in use :::3000
    ```
-   **Solution**: Change the port number or stop the conflicting process:
+   **解決方法**: ポート番号を変更するか、競合するプロセスを停止してください：
    ```bash
-   lsof -ti:3000 | xargs kill -9  # Kill process using port 3000
+   lsof -ti:3000 | xargs kill -9  # ポート3000を使用しているプロセスを終了
    ```
 
-2. **Data File Corruption**
-   If the `data.json` file becomes corrupted:
+2. **データファイルの破損**
+   `data.json`ファイルが破損した場合：
    ```bash
    rm data.json
-   npm start  # Will create a new empty data file
+   npm start  # 新しい空のデータファイルが作成されます
    ```
 
-3. **Module Installation Issues**
+3. **モジュールインストールの問題**
    ```bash
    rm -rf node_modules package-lock.json
    npm install
    ```
 
-4. **Japanese Text Display Issues**
-   Ensure your browser supports UTF-8 encoding and has Japanese fonts installed.
+4. **日本語テキスト表示の問題**
+   ブラウザがUTF-8エンコーディングをサポートし、日本語フォントがインストールされていることを確認してください。
 
-## 🔮 Future Enhancements
+## 🔮 今後の拡張予定
 
-Potential features for future versions:
-- 🔍 Search and filter functionality
-- 🏷️ Tags and categories for better organization
-- 📤 Export memos to different formats (PDF, TXT)
-- 🔐 User authentication and private memos
-- 📱 Mobile app version
-- ☁️ Cloud synchronization
+将来のバージョンで予定している機能：
+- 🔍 検索・フィルター機能
+- 🏷️ より良い整理のためのタグとカテゴリ
+- 📤 異なる形式（PDF、TXT）へのメモエクスポート
+- 🔐 ユーザー認証とプライベートメモ
+- 📱 モバイルアプリ版
+- ☁️ クラウド同期
 
-## 📝 License
+## 📝 ライセンス
 
-This project is open source and available under the [MIT License](LICENSE).
+このプロジェクトはオープンソースで、[MIT License](LICENSE)の下で利用可能です。
 
-## 🤝 Contributing
+## 🤝 貢献
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+貢献を歓迎します！お気軽にIssueやPull Requestを提出してください。
 
 ---
 
