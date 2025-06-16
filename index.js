@@ -1,48 +1,292 @@
+// ============================================
+// 日本語メモアプリケーション - Fastify版（改善版）
+// ============================================
+// このアプリケーションは、Fastifyフレームワークを使用して
+// 日本語でメモを作成・管理できるWebアプリです。
+// セキュリティ、エラーハンドリング、パフォーマンスを改善しています。
+
+// ============================================
+// 1. 必要なモジュールのインポート
+// ============================================
+
+// Fastify - 高速で軽量なNode.js用Webフレームワーク
 const fastify = require('fastify')({ 
-  logger: true 
+  // logger設定を環境に応じて変更
+  logger: {
+    level: process.env.LOG_LEVEL || 'info',
+    // 開発環境では読みやすい形式で出力
+    prettyPrint: process.env.NODE_ENV === 'development' ? {
+      translateTime: 'HH:MM:ss Z',
+      ignore: 'pid,hostname'
+    } : false
+  }
 });
+
+// Node.jsの標準ファイルシステムモジュール（Promise版）
 const fs = require('fs').promises;
+
+// Node.jsの標準パスモジュール
 const path = require('path');
 
-const DATA_FILE = path.join(__dirname, 'data.json');
+// ============================================
+// 2. 設定の定義（環境変数対応）
+// ============================================
 
-// データファイルの読み込み
+const config = {
+  port: parseInt(process.env.PORT) || 3000,
+  host: process.env.HOST || '0.0.0.0',
+  dataFile: process.env.DATA_FILE || path.join(__dirname, 'data.json'),
+  isDevelopment: process.env.NODE_ENV === 'development',
+  cacheEnabled: process.env.CACHE_ENABLED !== 'false',
+  cacheDuration: parseInt(process.env.CACHE_DURATION) || 5000
+};
+
+// データファイルのパスを定義
+const DATA_FILE = config.dataFile;
+
+// ============================================
+// 3. ユーティリティ関数
+// ============================================
+
+// HTMLエスケープ関数（XSS対策）
+function escapeHtml(unsafe) {
+  if (typeof unsafe !== 'string') {
+    return unsafe;
+  }
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// ============================================
+// 4. キャッシュ管理
+// ============================================
+
+let memosCache = null;
+let cacheTimestamp = null;
+
+// キャッシュをクリアする関数
+function clearCache() {
+  memosCache = null;
+  cacheTimestamp = null;
+}
+
+// ============================================
+// 5. データ管理用のヘルパー関数（改善版）
+// ============================================
+
+// データファイルからメモデータを読み込む非同期関数
 async function loadData() {
   try {
+    // UTF-8エンコーディングでファイルを読み込む
     const data = await fs.readFile(DATA_FILE, 'utf8');
-    return JSON.parse(data);
+    
+    // JSON文字列をJavaScriptオブジェクトに変換
+    const parsedData = JSON.parse(data);
+    
+    // データの検証
+    if (!Array.isArray(parsedData)) {
+      throw new Error('データファイルの形式が不正です');
+    }
+    
+    return parsedData;
   } catch (error) {
-    // ファイルが存在しない場合は空配列を返す
-    return [];
+    if (error.code === 'ENOENT') {
+      // ファイルが存在しない場合は空配列を返す
+      fastify.log.info('データファイルが存在しません。新規作成します。');
+      return [];
+    } else if (error instanceof SyntaxError) {
+      // JSONパースエラーの場合
+      fastify.log.error('データファイルのJSONが不正です:', error);
+      throw new Error('データファイルが破損しています。管理者に連絡してください。');
+    } else {
+      // その他のエラー
+      fastify.log.error('データ読み込みエラー:', error);
+      throw error;
+    }
   }
 }
 
-// データファイルの保存
-async function saveData(data) {
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+// キャッシュ機能付きのデータ読み込み
+async function loadDataWithCache() {
+  // キャッシュが無効な場合は直接読み込む
+  if (!config.cacheEnabled) {
+    return await loadData();
+  }
+
+  const now = Date.now();
+  
+  // キャッシュが有効な場合はそれを返す
+  if (memosCache && cacheTimestamp && (now - cacheTimestamp < config.cacheDuration)) {
+    fastify.log.debug('キャッシュからデータを返します');
+    return memosCache;
+  }
+  
+  // キャッシュが無効な場合は新しく読み込む
+  fastify.log.debug('ファイルからデータを読み込みます');
+  memosCache = await loadData();
+  cacheTimestamp = now;
+  return memosCache;
 }
 
-// 静的ファイルの配信設定
+// データをファイルに保存する非同期関数
+async function saveData(data) {
+  try {
+    // バックアップを作成（オプション）
+    if (process.env.BACKUP_ENABLED === 'true') {
+      try {
+        const backupPath = `${DATA_FILE}.backup`;
+        await fs.copyFile(DATA_FILE, backupPath);
+      } catch (backupError) {
+        fastify.log.warn('バックアップの作成に失敗しました:', backupError);
+      }
+    }
+    
+    // データを保存
+    await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+    
+    // キャッシュをクリア
+    clearCache();
+    
+    fastify.log.debug('データを保存しました');
+  } catch (error) {
+    fastify.log.error('データ保存エラー:', error);
+    throw new Error('データの保存に失敗しました。');
+  }
+}
+
+// ============================================
+// 6. ID管理の改善
+// ============================================
+
+let lastId = 0;
+
+async function initializeLastId() {
+  const memos = await loadData();
+  if (memos.length > 0) {
+    lastId = Math.max(...memos.map(m => m.id));
+  }
+}
+
+function getNextId() {
+  return ++lastId;
+}
+
+// ============================================
+// 7. バリデーションスキーマ
+// ============================================
+
+// メモの作成・更新用スキーマ
+const memoBodySchema = {
+  type: 'object',
+  required: ['title', 'content'],
+  properties: {
+    title: { 
+      type: 'string',
+      minLength: 1,
+      maxLength: 200,
+      pattern: '^[^<>]*$' // 基本的なHTMLタグを拒否
+    },
+    content: { 
+      type: 'string',
+      minLength: 1,
+      maxLength: 5000
+    }
+  },
+  additionalProperties: false
+};
+
+// IDパラメータのスキーマ
+const idParamSchema = {
+  type: 'object',
+  properties: {
+    id: { 
+      type: 'string',
+      pattern: '^[0-9]+$'
+    }
+  },
+  required: ['id']
+};
+
+// ============================================
+// 8. 静的ファイル配信の設定
+// ============================================
+
+// @fastify/staticプラグインを登録
 fastify.register(require('@fastify/static'), {
   root: path.join(__dirname, 'public'),
   prefix: '/public/',
+  cacheControl: true,
+  maxAge: config.isDevelopment ? 0 : '7d'
 });
 
-// ルートパス - メインページ
+// ============================================
+// 9. グローバルエラーハンドラー
+// ============================================
+
+// カスタムエラーハンドラーを設定
+fastify.setErrorHandler(async (error, request, reply) => {
+  // エラーをログに記録
+  fastify.log.error({
+    err: error,
+    request: {
+      method: request.method,
+      url: request.url,
+      headers: request.headers
+    }
+  });
+
+  // バリデーションエラーの場合
+  if (error.validation) {
+    return reply.status(400).send({
+      error: 'バリデーションエラー',
+      message: '入力内容に誤りがあります。',
+      details: config.isDevelopment ? error.validation : undefined
+    });
+  }
+
+  // その他のエラー
+  const statusCode = error.statusCode || 500;
+  const message = statusCode === 500 ? 
+    'サーバーエラーが発生しました。' : 
+    error.message;
+
+  reply.status(statusCode).send({
+    error: message,
+    ...(config.isDevelopment && { 
+      stack: error.stack,
+      details: error.message 
+    })
+  });
+});
+
+// ============================================
+// 10. ルート定義 - メインページ
+// ============================================
+
+// GETリクエストでルートパス（/）にアクセスした時の処理
 fastify.get('/', async (request, reply) => {
   try {
-    const memos = await loadData();
+    // データファイルからメモ一覧を読み込む
+    const memos = await loadDataWithCache();
     
+    // レスポンスのContent-Typeを設定
     reply.type('text/html; charset=utf-8');
     
+    // HTMLテンプレートを返す（エスケープ処理付き）
     return `
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="日本語でメモを作成・管理できるWebアプリケーション">
     <title>日本語メモアプリ</title>
     <style>
+        /* CSSは後で外部ファイルに移動予定 */
         body {
             font-family: 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -126,6 +370,11 @@ fastify.get('/', async (request, reply) => {
             background: #5a67d8;
             transform: translateY(-1px);
         }
+        button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+        }
         button.delete {
             background: #e53e3e;
         }
@@ -203,6 +452,26 @@ fastify.get('/', async (request, reply) => {
             color: #4a5568;
             margin-bottom: 1rem;
         }
+        .error-message {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        .success-message {
+            background: #c6f6d5;
+            color: #2f855a;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
         @media (max-width: 768px) {
             .container {
                 padding: 0 10px;
@@ -224,33 +493,34 @@ fastify.get('/', async (request, reply) => {
         </div>
         
         <div class="card">
-            <!-- 新しいメモ追加フォーム -->
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+            
             <div class="memo-form">
                 <h2>新しいメモを作成</h2>
                 <form id="addForm">
                     <div class="form-group">
-                        <label for="newTitle">タイトル:</label>
-                        <input type="text" id="newTitle" name="title" placeholder="メモのタイトルを入力..." required>
+                        <label for="newTitle">タイトル: <small>(最大200文字)</small></label>
+                        <input type="text" id="newTitle" name="title" placeholder="メモのタイトルを入力..." required maxlength="200">
                     </div>
                     <div class="form-group">
-                        <label for="newContent">内容:</label>
-                        <textarea id="newContent" name="content" placeholder="メモの内容を入力してください..." required></textarea>
+                        <label for="newContent">内容: <small>(最大5000文字)</small></label>
+                        <textarea id="newContent" name="content" placeholder="メモの内容を入力してください..." required maxlength="5000"></textarea>
                     </div>
-                    <button type="submit">💾 メモを保存</button>
+                    <button type="submit" id="submitButton">💾 メモを保存</button>
                 </form>
             </div>
         </div>
         
         <div class="card">
-            <!-- メモ一覧 -->
             <div class="memo-list">
                 <h2>📋 メモ一覧</h2>
                 <div class="memo-count">全 ${memos.length} 件のメモ</div>
                 ${memos.length === 0 ? '<div class="no-memos">まだメモがありません。上のフォームから最初のメモを作成しましょう！</div>' : 
                   memos.map(memo => `
                     <div class="memo-item" data-id="${memo.id}">
-                        <div class="memo-title">${memo.title}</div>
-                        <div class="memo-content">${memo.content}</div>
+                        <div class="memo-title">${escapeHtml(memo.title)}</div>
+                        <div class="memo-content">${escapeHtml(memo.content)}</div>
                         <div class="memo-meta">
                             <span>📅 作成: ${new Date(memo.createdAt).toLocaleString('ja-JP')}</span>
                             ${memo.updatedAt !== memo.createdAt ? 
@@ -264,12 +534,12 @@ fastify.get('/', async (request, reply) => {
                         <div class="edit-form" id="edit-${memo.id}">
                             <h3>メモを編集</h3>
                             <div class="form-group">
-                                <label>タイトル:</label>
-                                <input type="text" id="editTitle-${memo.id}" value="${memo.title}">
+                                <label>タイトル: <small>(最大200文字)</small></label>
+                                <input type="text" id="editTitle-${memo.id}" value="${escapeHtml(memo.title)}" maxlength="200">
                             </div>
                             <div class="form-group">
-                                <label>内容:</label>
-                                <textarea id="editContent-${memo.id}">${memo.content}</textarea>
+                                <label>内容: <small>(最大5000文字)</small></label>
+                                <textarea id="editContent-${memo.id}" maxlength="5000">${escapeHtml(memo.content)}</textarea>
                             </div>
                             <button onclick="updateMemo(${memo.id})">💾 更新</button>
                             <button class="cancel" onclick="toggleEdit(${memo.id})">❌ キャンセル</button>
@@ -282,11 +552,51 @@ fastify.get('/', async (request, reply) => {
     </div>
 
     <script>
+        // エラーメッセージを表示
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // 成功メッセージを表示
+        function showSuccess(message) {
+            const successDiv = document.getElementById('successMessage');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // ローディング状態の管理
+        function setLoading(isLoading) {
+            const container = document.querySelector('.container');
+            if (isLoading) {
+                container.classList.add('loading');
+            } else {
+                container.classList.remove('loading');
+            }
+        }
+
         // 新しいメモを追加
         document.getElementById('addForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const title = document.getElementById('newTitle').value;
-            const content = document.getElementById('newContent').value;
+            
+            const title = document.getElementById('newTitle').value.trim();
+            const content = document.getElementById('newContent').value.trim();
+            
+            if (!title || !content) {
+                showError('タイトルと内容は必須です。');
+                return;
+            }
+            
+            setLoading(true);
+            const submitButton = document.getElementById('submitButton');
+            submitButton.disabled = true;
             
             try {
                 const response = await fetch('/api/memos', {
@@ -298,33 +608,46 @@ fastify.get('/', async (request, reply) => {
                 });
                 
                 if (response.ok) {
-                    location.reload();
+                    showSuccess('メモを保存しました。');
+                    setTimeout(() => location.reload(), 1000);
                 } else {
                     const error = await response.json();
-                    alert('メモの保存に失敗しました: ' + error.error);
+                    showError(error.error || 'メモの保存に失敗しました。');
                 }
             } catch (error) {
-                alert('エラーが発生しました: ' + error.message);
+                showError('ネットワークエラーが発生しました。');
+                console.error('Error:', error);
+            } finally {
+                setLoading(false);
+                submitButton.disabled = false;
             }
         });
         
         // メモを削除
         async function deleteMemo(id) {
-            if (confirm('このメモを削除しますか？削除すると元に戻せません。')) {
-                try {
-                    const response = await fetch(\`/api/memos/\${id}\`, {
-                        method: 'DELETE',
-                    });
-                    
-                    if (response.ok) {
-                        location.reload();
-                    } else {
-                        const error = await response.json();
-                        alert('メモの削除に失敗しました: ' + error.error);
-                    }
-                } catch (error) {
-                    alert('エラーが発生しました: ' + error.message);
+            if (!confirm('このメモを削除しますか？削除すると元に戻せません。')) {
+                return;
+            }
+            
+            setLoading(true);
+            
+            try {
+                const response = await fetch(\`/api/memos/\${id}\`, {
+                    method: 'DELETE',
+                });
+                
+                if (response.ok) {
+                    showSuccess('メモを削除しました。');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    const error = await response.json();
+                    showError(error.error || 'メモの削除に失敗しました。');
                 }
+            } catch (error) {
+                showError('ネットワークエラーが発生しました。');
+                console.error('Error:', error);
+            } finally {
+                setLoading(false);
             }
         }
         
@@ -336,13 +659,15 @@ fastify.get('/', async (request, reply) => {
         
         // メモを更新
         async function updateMemo(id) {
-            const title = document.getElementById(\`editTitle-\${id}\`).value;
-            const content = document.getElementById(\`editContent-\${id}\`).value;
+            const title = document.getElementById(\`editTitle-\${id}\`).value.trim();
+            const content = document.getElementById(\`editContent-\${id}\`).value.trim();
             
-            if (!title.trim() || !content.trim()) {
-                alert('タイトルと内容は必須です。');
+            if (!title || !content) {
+                showError('タイトルと内容は必須です。');
                 return;
             }
+            
+            setLoading(true);
             
             try {
                 const response = await fetch(\`/api/memos/\${id}\`, {
@@ -354,13 +679,17 @@ fastify.get('/', async (request, reply) => {
                 });
                 
                 if (response.ok) {
-                    location.reload();
+                    showSuccess('メモを更新しました。');
+                    setTimeout(() => location.reload(), 1000);
                 } else {
                     const error = await response.json();
-                    alert('メモの更新に失敗しました: ' + error.error);
+                    showError(error.error || 'メモの更新に失敗しました。');
                 }
             } catch (error) {
-                alert('エラーが発生しました: ' + error.message);
+                showError('ネットワークエラーが発生しました。');
+                console.error('Error:', error);
+            } finally {
+                setLoading(false);
             }
         }
     </script>
@@ -368,39 +697,35 @@ fastify.get('/', async (request, reply) => {
 </html>
     `;
   } catch (error) {
-    fastify.log.error(error);
-    reply.code(500).send({ error: 'Internal Server Error' });
+    throw error; // グローバルエラーハンドラーに処理を委譲
   }
 });
+
+// ============================================
+// 11. REST API エンドポイント
+// ============================================
 
 // API: 全メモ取得
 fastify.get('/api/memos', async (request, reply) => {
   try {
-    const memos = await loadData();
+    const memos = await loadDataWithCache();
     reply.send(memos);
   } catch (error) {
-    fastify.log.error(error);
-    reply.code(500).send({ error: 'Internal Server Error' });
+    throw error;
   }
 });
 
 // API: メモ追加
-fastify.post('/api/memos', async (request, reply) => {
+fastify.post('/api/memos', {
+  schema: {
+    body: memoBodySchema
+  }
+}, async (request, reply) => {
   try {
     const { title, content } = request.body;
     
-    if (!title || title.trim() === '') {
-      reply.code(400).send({ error: 'タイトルが必要です' });
-      return;
-    }
-    
-    if (!content || content.trim() === '') {
-      reply.code(400).send({ error: '内容が必要です' });
-      return;
-    }
-    
     const memos = await loadData();
-    const newId = memos.length > 0 ? Math.max(...memos.map(m => m.id)) + 1 : 1;
+    const newId = getNextId();
     const now = new Date().toISOString();
     
     const newMemo = {
@@ -416,26 +741,20 @@ fastify.post('/api/memos', async (request, reply) => {
     
     reply.code(201).send(newMemo);
   } catch (error) {
-    fastify.log.error(error);
-    reply.code(500).send({ error: 'Internal Server Error' });
+    throw error;
   }
 });
 
 // API: メモ更新
-fastify.put('/api/memos/:id', async (request, reply) => {
+fastify.put('/api/memos/:id', {
+  schema: {
+    params: idParamSchema,
+    body: memoBodySchema
+  }
+}, async (request, reply) => {
   try {
     const id = parseInt(request.params.id);
     const { title, content } = request.body;
-    
-    if (!title || title.trim() === '') {
-      reply.code(400).send({ error: 'タイトルが必要です' });
-      return;
-    }
-    
-    if (!content || content.trim() === '') {
-      reply.code(400).send({ error: '内容が必要です' });
-      return;
-    }
     
     const memos = await loadData();
     const memoIndex = memos.findIndex(m => m.id === id);
@@ -453,13 +772,16 @@ fastify.put('/api/memos/:id', async (request, reply) => {
     
     reply.send(memos[memoIndex]);
   } catch (error) {
-    fastify.log.error(error);
-    reply.code(500).send({ error: 'Internal Server Error' });
+    throw error;
   }
 });
 
 // API: メモ削除
-fastify.delete('/api/memos/:id', async (request, reply) => {
+fastify.delete('/api/memos/:id', {
+  schema: {
+    params: idParamSchema
+  }
+}, async (request, reply) => {
   try {
     const id = parseInt(request.params.id);
     const memos = await loadData();
@@ -473,24 +795,66 @@ fastify.delete('/api/memos/:id', async (request, reply) => {
     const deletedMemo = memos.splice(memoIndex, 1)[0];
     await saveData(memos);
     
+    // 削除されたメモのIDを再利用しないようにする
+    if (deletedMemo.id === lastId) {
+      lastId--;
+    }
+    
     reply.send(deletedMemo);
   } catch (error) {
-    fastify.log.error(error);
-    reply.code(500).send({ error: 'Internal Server Error' });
+    throw error;
   }
 });
 
-// サーバーを3000番ポートで起動
+// ============================================
+// 12. プロセスレベルのエラーハンドリング
+// ============================================
+
+// 未処理の例外をキャッチ
+process.on('uncaughtException', (error) => {
+  fastify.log.fatal(error, 'Uncaught Exception');
+  process.exit(1);
+});
+
+// 未処理のPromiseリジェクションをキャッチ
+process.on('unhandledRejection', (reason, promise) => {
+  fastify.log.fatal({ reason, promise }, 'Unhandled Rejection');
+  process.exit(1);
+});
+
+// 正常終了時の処理
+process.on('SIGTERM', async () => {
+  fastify.log.info('SIGTERM signal received');
+  try {
+    await fastify.close();
+    fastify.log.info('Server closed');
+    process.exit(0);
+  } catch (error) {
+    fastify.log.error(error, 'Error closing server');
+    process.exit(1);
+  }
+});
+
+// ============================================
+// 13. サーバー起動処理
+// ============================================
+
 const start = async () => {
   try {
+    // 最後のIDを初期化
+    await initializeLastId();
+    
+    // Fastifyサーバーを起動
     await fastify.listen({ 
-      port: 3000, 
-      host: '0.0.0.0' 
+      port: config.port,
+      host: config.host
     });
-    console.log('🚀 日本語メモアプリが http://localhost:3000 で起動しました');
+    
+    fastify.log.info(`🚀 日本語メモアプリが http://localhost:${config.port} で起動しました`);
+    fastify.log.info(`環境: ${config.isDevelopment ? '開発' : '本番'}`);
+    fastify.log.info(`キャッシュ: ${config.cacheEnabled ? '有効' : '無効'}`);
   } catch (err) {
     fastify.log.error(err);
-    console.error('❌ サーバーの起動に失敗しました:', err.message);
     process.exit(1);
   }
 };
