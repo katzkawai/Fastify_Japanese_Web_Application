@@ -1,13 +1,27 @@
 {
   "name": "japanese-memo-app",
+  "version": "1.0.0",
+  "description": "Fastifyを使用した日本語メモアプリケーション",
+  "main": "index.js",
   "private": true,
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [
+    "fastify",
+    "memo",
+    "japanese",
+    "web-app"
+  ],
+  "author": "katzkawai",
+  "license": "MIT",
   "dependencies": {
     "fastify": "^4.24.3",
     "@fastify/static": "^6.12.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
