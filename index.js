@@ -13,12 +13,9 @@
 const fastify = require('fastify')({ 
   // logger設定を環境に応じて変更
   logger: {
-    level: process.env.LOG_LEVEL || 'info',
-    // 開発環境では読みやすい形式で出力
-    prettyPrint: process.env.NODE_ENV === 'development' ? {
-      translateTime: 'HH:MM:ss Z',
-      ignore: 'pid,hostname'
-    } : false
+    level: process.env.LOG_LEVEL || 'info'
+    // 注: prettyPrintは非推奨。開発環境では pino-pretty を使用してください
+    // 実行例: NODE_ENV=development node index.js | npx pino-pretty
   }
 });
 
